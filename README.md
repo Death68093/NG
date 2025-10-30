@@ -32,18 +32,14 @@ local NG_Click = NG_Events:FindFirstChild("NG_Click") or Instance.new("RemoteEve
 NG_Click.Name = "NG_Click"
 NG_Click.Parent = NG_Events
 
-
 local function punishPlayer(player, reason)
 	if not player or not player:IsA("Player") then return end
 	if config.Punishment == "kick" then
 		player:Kick("Anticheat kicked: "..tostring(reason))
 	elseif config.Punishment == "respawn" then
-		if player.Character then
-			player.Character:BreakJoints()
-		end
+		if player.Character then player.Character:BreakJoints() end
 	elseif config.Punishment == "ban" then
 		player:Kick("Anticheat banned: "..tostring(reason))
-
 	elseif config.Punishment == "banWorld" and config.BanWorldId then
         TeleportService:TeleportAsync(config.BanWorldId, player)
 	end
@@ -53,12 +49,13 @@ local function createHitbox(player, char)
     if not char then return end
     local hum = char:FindFirstChild("Humanoid")
     if not hum then return end
-    if char:FindFirstChild("NG_Hitbox") then return end
+    local existing = char:FindFirstChild("NG_Hitbox")
+    if existing then existing:Destroy() end
 
     local basePart
     if hum.RigType == Enum.HumanoidRigType.R6 then
         basePart = char:FindFirstChild("Torso")
-    else -- R15
+    else
         basePart = char:FindFirstChild("HumanoidRootPart")
     end
     if not basePart then return end
@@ -88,75 +85,49 @@ local function createHitbox(player, char)
         local otherChar = hit and hit.Parent
         local otherPlayer = otherChar and Players:GetPlayerFromCharacter(otherChar)
         if not otherPlayer or otherPlayer == player then return end
-
         debounce = true
         NG_Fail:Fire(player, "No-Clip")
-        task.delay(config.NoClipTimer or 1, function()
-            debounce = false
-        end)
+        task.delay(config.NoClipTimer or 1, function() debounce = false end)
     end)
 
     player.CharacterRemoving:Connect(function()
-        if hitbox and hitbox.Parent then
-            hitbox:Destroy()
-        end
+        if hitbox and hitbox.Parent then hitbox:Destroy() end
     end)
 end
-
-
-
-
 
 local function setupPlayer(player)
 	player.CharacterAdded:Connect(function(char)
         char:SetAttribute("NG_Falling", false)
-		if config.CheckNoClip then
-			createHitbox(player, char)
-		end
+		if config.CheckNoClip then createHitbox(player, char) end
 	end)
 	if player.Character then
-		if config.CheckNoClip then
-			createHitbox(player, player.Character)
-		end
+		if config.CheckNoClip then createHitbox(player, player.Character) end
 	end
 end
 
 Players.PlayerAdded:Connect(setupPlayer)
-for _, p in ipairs(Players:GetPlayers()) do
-	setupPlayer(p)
-end
-
+for _, p in ipairs(Players:GetPlayers()) do setupPlayer(p) end
 
 RunService.Heartbeat:Connect(function()
 	for _, player in ipairs(Players:GetPlayers()) do
 		local success, data = pcall(function()
 			return NG_GetClient:InvokeClient(player, key)
 		end)
-		if not success or not data then
-			warn("Client did not respond: "..player.Name)
-			continue
-		end
+		if not success or not data then continue end
 
 		local char = player.Character
 		if not char then continue end
-
 		local hum = char:FindFirstChild("Humanoid")
 		if not hum then continue end
 
-		
 		if config.CheckSpeed then
 			if (config.UseServerSpeed or config.UseServer) then
-				if data.speed ~= hum.WalkSpeed then
-					punishPlayer(player, "Speed")
-				end
+				if data.speed ~= hum.WalkSpeed then punishPlayer(player, "Speed") end
 			else
-				if data.speed > config.MaxSpeed then
-					punishPlayer(player, "Speed")
-				end
+				if data.speed > config.MaxSpeed then punishPlayer(player, "Speed") end
 			end
 		end
 
-		
 		if config.CheckJump then
 			if (config.UseServerJump or config.UseServer) then
 				if data.jumpPower ~= hum.JumpPower or data.jumpHeight ~= (hum.JumpHeight or 0) then
@@ -169,16 +140,11 @@ RunService.Heartbeat:Connect(function()
 			end
 		end
 
-		
 		if config.CheckGravity then
 			if (config.UseServerGravity or config.UseServer) then
-				if data.gravity ~= Workspace.Gravity then
-					punishPlayer(player, "Gravity")
-				end
+				if data.gravity ~= Workspace.Gravity then punishPlayer(player, "Gravity") end
 			else
-				if data.gravity < config.MinGravity or data.gravity > config.MaxGravity then
-					punishPlayer(player, "Gravity")
-				end
+				if data.gravity < config.MinGravity or data.gravity > config.MaxGravity then punishPlayer(player, "Gravity") end
 			end
 		end
 
@@ -188,32 +154,20 @@ RunService.Heartbeat:Connect(function()
         elseif state == Enum.HumanoidStateType.Freefall then
             player.Character:SetAttribute("NG_Falling", true)
         elseif state == Enum.HumanoidStateType.Jumping then
-            if player.Character:GetAttribute("NG_Falling") then
-                NG_Fail:Fire(player, "Infinite Jump")
-            end
+            if player.Character:GetAttribute("NG_Falling") then NG_Fail:Fire(player, "Infinite Jump") end
         end
-
-
 	end
 end)
 
-
--- ======== EXTEIOR CHECKS ======== --
-
 if config.CheckAutoClick then
     NG_Click.OnServerEvent:Connect(function(plr, clicks)
-        if clicks >= config.MaxCps then
-            NG_Fail:Fire(plr, "AutoClicking")
-        end
+        if clicks >= config.MaxCps then NG_Fail:Fire(plr, "AutoClicking") end
     end)
 end
 
-
-NG_Fail.Event:Connect(function(plr, reason)
-	punishPlayer(plr, reason)
-end)
-
+NG_Fail.Event:Connect(punishPlayer)
 print("[NG] Loaded")
+
 ```
 </details>
 
@@ -225,26 +179,21 @@ print("[NG] Loaded")
  # Put in StarterPlayer > StarterPlayerScripts
 
  ```
- local Players = game:GetService("Players")
+local Players = game:GetService("Players")
 local RepStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 
-local NG_GetClient = RepStorage:WaitForChild("NG_GetClient")
-local NG_Click = RepStorage:WaitForChild("NG_Click")
+local NG_GetClient = RepStorage:WaitForChild("NG_Events"):WaitForChild("NG_GetClient")
+local NG_Click = RepStorage:WaitForChild("NG_Events"):WaitForChild("NG_Click")
 
 local player = Players.LocalPlayer
-
+local clicks = 0
 
 local function getHumanoid()
-    local char = player.Character
-    if char then
-        return char:FindFirstChild("Humanoid")
-    end
-    return nil
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("Humanoid")
 end
-
-local clicks = 0
 
 while task.wait(1) do
     NG_Click:FireServer(clicks)
@@ -253,29 +202,17 @@ end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        clicks = clicks + 1
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then clicks = clicks + 1 end
 end)
 
 NG_GetClient.OnClientInvoke = function(key)
     local hum = getHumanoid()
-    local walkSpeed, jumpPower, jumpHeight = 0, 0, 0
-
-    if hum then
-        walkSpeed = hum.WalkSpeed
-        jumpPower = hum.JumpPower
-        jumpHeight = hum.JumpHeight or 0
-    end
-
-    return {
-        speed = walkSpeed,
-        jumpHeight = jumpHeight,
-        jumpPower = jumpPower,
-        gravity = Workspace.Gravity,
-        key = key
-    }
+    local walkSpeed = hum and hum.WalkSpeed or 0
+    local jumpPower = hum and hum.JumpPower or 0
+    local jumpHeight = hum and (hum.JumpHeight or 0) or 0
+    return {speed = walkSpeed, jumpHeight = jumpHeight, jumpPower = jumpPower, gravity = Workspace.Gravity, key = key}
 end
+
 ```
 </details>
 
